@@ -1,19 +1,21 @@
 const authService = require('../services/authService');
 
+function serializeUser(user) {
+  return {
+    id: user._id.toString(),
+    email: user.email,
+    role: user.role
+  };
+}
+
 function handleError(res, error) {
   return res.status(error.status || 500).json({ error: error.message });
 }
 
 async function register(req, res) {
   try {
-    const user = await authService.registerUser(req.body || {});
-    return res.status(201).json({
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role
-      }
-    });
+    const user = await authService.registerUser({ firebaseUser: req.firebaseUser });
+    return res.status(201).json({ user: serializeUser(user) });
   } catch (error) {
     return handleError(res, error);
   }
@@ -21,8 +23,8 @@ async function register(req, res) {
 
 async function login(req, res) {
   try {
-    const token = await authService.loginUser(req.body || {});
-    return res.status(200).json({ token });
+    const user = await authService.loginUser({ firebaseUser: req.firebaseUser });
+    return res.status(200).json({ user: serializeUser(user) });
   } catch (error) {
     return handleError(res, error);
   }

@@ -2,16 +2,37 @@ jest.mock('../src/models/Registration', () => ({
   find: jest.fn()
 }));
 
+jest.mock('../src/models/User', () => ({
+  findOne: jest.fn()
+}));
+
+jest.mock('../src/config/firebase', () => ({
+  getFirebaseAuth: jest.fn()
+}));
+
 const Registration = require('../src/models/Registration');
+const User = require('../src/models/User');
+const { getFirebaseAuth } = require('../src/config/firebase');
 const { attendanceReport } = require('../src/services/reportService');
 const CsvExporter = require('../src/exporters/CsvExporter');
 const app = require('../src/app');
-const jwt = require('jsonwebtoken');
 const request = require('supertest');
 
 describe('attendance report behavior', () => {
   beforeEach(() => {
     Registration.find.mockReset();
+    User.findOne.mockResolvedValue({
+      _id: { toString: () => 'admin-user' },
+      firebaseUid: 'admin-user',
+      email: 'admin@example.edu',
+      role: 'admin'
+    });
+    getFirebaseAuth.mockReturnValue({
+      verifyIdToken: jest.fn().mockResolvedValue({
+        uid: 'admin-user',
+        email: 'admin@example.edu'
+      })
+    });
   });
 
   test('maps registration rows to user id and status', async () => {
@@ -36,11 +57,7 @@ describe('attendance report behavior', () => {
     expect(exporter.export([
       { user_id: 'user-1', status: 'confirmed' },
       { user_id: 'user-2', status: 'waitlisted' }
-    ])).toBe(
-      'user_id,status\n' +
-      'user-1,confirmed\n' +
-      'user-2,waitlisted'
-    );
+    ])).toBe('user_id,status\nuser-1,confirmed\nuser-2,waitlisted');
   });
 
   test('returns an empty string when there are no attendance rows', () => {
@@ -49,20 +66,15 @@ describe('attendance report behavior', () => {
     expect(exporter.export([])).toBe('');
   });
 
-  test('serves CSV attendance data only to an authenticated admin', async () => {
+  test('serves CSV attendance data to an authenticated admin', async () => {
     const lean = jest.fn().mockResolvedValue([
       { userId: 'user-1', status: 'confirmed' }
     ]);
     Registration.find.mockReturnValue({ lean });
-    process.env.JWT_SECRET = 'report-test-secret';
-    const token = jwt.sign(
-      { id: 'admin-1', role: 'admin' },
-      process.env.JWT_SECRET
-    );
 
     const response = await request(app)
       .get('/api/reports/attendance/event-1?format=csv')
-      .set('Authorization', `Bearer ${token}`);
+      .set('Authorization', 'Bearer firebase-id-token');
 
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/text\/csv/);

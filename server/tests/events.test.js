@@ -4,30 +4,46 @@ jest.mock('../src/models/Event', () => ({
   findById: jest.fn()
 }));
 
-const jwt = require('jsonwebtoken');
+jest.mock('../src/models/User', () => ({
+  findOne: jest.fn()
+}));
+
+jest.mock('../src/config/firebase', () => ({
+  getFirebaseAuth: jest.fn()
+}));
+
 const request = require('supertest');
 const Event = require('../src/models/Event');
+const User = require('../src/models/User');
+const { getFirebaseAuth } = require('../src/config/firebase');
 const app = require('../src/app');
 const eventService = require('../src/services/eventService');
 
 describe('events', () => {
-  const secret = 'event-test-secret';
   const ownerId = '507f1f77bcf86cd799439011';
   const otherId = '507f1f77bcf86cd799439012';
   const eventId = '507f1f77bcf86cd799439013';
-
-  beforeAll(() => {
-    process.env.JWT_SECRET = secret;
-  });
 
   beforeEach(() => {
     Event.create.mockReset();
     Event.find.mockReset();
     Event.findById.mockReset();
+    User.findOne.mockImplementation(async ({ firebaseUid }) => ({
+      _id: { toString: () => firebaseUid },
+      firebaseUid,
+      email: `${firebaseUid}@example.edu`,
+      role: firebaseUid === ownerId || firebaseUid === otherId ? 'organizer' : 'student'
+    }));
+    getFirebaseAuth.mockReturnValue({
+      verifyIdToken: jest.fn(async (value) => {
+        const [uid] = value.split(':');
+        return { uid, email: `${uid}@example.edu` };
+      })
+    });
   });
 
-  function token(id = ownerId, role = 'organizer') {
-    return jwt.sign({ id, role }, secret);
+  function token(id = ownerId) {
+    return `Bearer ${id}:firebase-token`;
   }
 
   function ownedEvent() {
@@ -69,13 +85,13 @@ describe('events', () => {
     const unauthorized = await request(app).post('/api/events').send({ title: 'Event' });
     const student = await request(app)
       .post('/api/events')
-      .set('Authorization', `Bearer ${token(ownerId, 'student')}`)
+      .set('Authorization', token('student-id'))
       .send({ title: 'Event' });
     const event = { _id: eventId, title: 'Event', organizerId: ownerId };
     Event.create.mockResolvedValue(event);
     const created = await request(app)
       .post('/api/events')
-      .set('Authorization', `Bearer ${token()}`)
+      .set('Authorization', token())
       .send({ title: 'Event' });
 
     expect(unauthorized.status).toBe(401);
@@ -93,7 +109,7 @@ describe('events', () => {
 
     const response = await request(app)
       .patch(`/api/events/${eventId}`)
-      .set('Authorization', `Bearer ${token()}`)
+      .set('Authorization', token())
       .send({ title: 'Updated', organizerId: otherId, cancelled: true });
 
     expect(response.status).toBe(200);
@@ -108,11 +124,11 @@ describe('events', () => {
 
     const update = await request(app)
       .patch(`/api/events/${eventId}`)
-      .set('Authorization', `Bearer ${token(otherId)}`)
+      .set('Authorization', token(otherId))
       .send({ title: 'Unauthorized edit' });
     const cancel = await request(app)
       .delete(`/api/events/${eventId}`)
-      .set('Authorization', `Bearer ${token(otherId)}`);
+      .set('Authorization', token(otherId));
 
     expect(update.status).toBe(403);
     expect(cancel.status).toBe(403);
@@ -124,7 +140,7 @@ describe('events', () => {
 
     const response = await request(app)
       .delete(`/api/events/${eventId}`)
-      .set('Authorization', `Bearer ${token()}`);
+      .set('Authorization', token());
 
     expect(response.status).toBe(200);
     expect(event.cancelled).toBe(true);
