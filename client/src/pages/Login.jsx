@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut
 } from 'firebase/auth';
@@ -8,12 +9,42 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { firebaseAuth, isFirebaseConfigured } from '../firebase';
 
+function getAuthErrorMessage(error, creatingAccount) {
+  if (error.code === 'ERR_NETWORK' && !error.response) {
+    return `Cannot reach the CampusEvents API at ${client.defaults.baseURL}. Start the server in a separate terminal with: cd server, then npm run dev. Ensure server/.env has a working MONGO_URI.`;
+  }
+
+  switch (error.code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Firebase could not sign you in with that email and password. Check both, or choose “Create an account” if you have not registered with Firebase yet.';
+    case 'auth/email-already-in-use':
+      return 'This email already has a Firebase account. Switch to Log in instead.';
+    case 'auth/weak-password':
+      return 'Choose a password with at least 6 characters.';
+    case 'auth/operation-not-allowed':
+      return 'Email/password sign-in is disabled. Enable the Email/Password provider in Firebase Console → Authentication → Sign-in method.';
+    case 'auth/invalid-api-key':
+    case 'auth/app-not-authorized':
+      return 'This app is not authorized by Firebase. Check the Firebase web app settings in client/.env and restart Vite.';
+    case 'auth/network-request-failed':
+      return 'Firebase could not be reached. Check your internet connection and try again.';
+    default:
+      if (error.response) {
+        return error.response.data?.error || 'The API could not complete authentication. Check that the server is running.';
+      }
+      return error.message || (creatingAccount ? 'Unable to create the account.' : 'Unable to log in.');
+  }
+}
+
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
   if (localStorage.getItem('token')) return <Navigate to="/events" replace />;
@@ -21,6 +52,7 @@ export default function Login({ onLogin }) {
   async function submit(event) {
     event.preventDefault();
     setError('');
+    setNotice('');
 
     if (!isFirebaseConfigured || !firebaseAuth) {
       setError('Firebase is not configured. Copy client/.env.example to client/.env and fill in your Firebase web app settings.');
@@ -48,9 +80,34 @@ export default function Login({ onLogin }) {
       localStorage.removeItem('token');
       setError(
         requestError.response?.data?.error ||
-        requestError.message ||
+        getAuthErrorMessage(requestError, creatingAccount) ||
         'Unable to authenticate. Check your Firebase Authentication settings.'
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendPasswordReset() {
+    setError('');
+    setNotice('');
+
+    if (!isFirebaseConfigured || !firebaseAuth) {
+      setError('Firebase is not configured. Check the client/.env Firebase settings.');
+      return;
+    }
+
+    if (!email.trim()) {
+      setError('Enter your account email first so Firebase knows where to send the reset link.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email.trim());
+      setNotice('If this email has a Firebase account, a password reset link has been sent.');
+    } catch (requestError) {
+      setError(getAuthErrorMessage(requestError, false));
     } finally {
       setBusy(false);
     }
@@ -82,9 +139,15 @@ export default function Login({ onLogin }) {
           />
         </label>
         {error && <p className="error" role="alert">{error}</p>}
+        {notice && <p className="success" role="status">{notice}</p>}
         <button type="submit" disabled={busy}>
           {busy ? 'Please wait…' : creatingAccount ? 'Create account' : 'Log in'}
         </button>
+        {!creatingAccount && (
+          <button type="button" className="text-button" disabled={busy} onClick={sendPasswordReset}>
+            Forgot password?
+          </button>
+        )}
         <button
           type="button"
           className="text-button"
