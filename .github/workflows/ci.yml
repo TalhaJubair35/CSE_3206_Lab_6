@@ -1,1 +1,42 @@
-# TODO
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      # Check out the repository.
+      - uses: actions/checkout@v4
+      # Set up Node.js 20 and cache npm dependencies.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      # Install the exact server dependencies from the lockfile.
+      - run: npm ci
+      # Run server tests and enforce coverage thresholds.
+      - run: npx jest --coverage --ci
+
+  client:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      # Check out the repository.
+      - uses: actions/checkout@v4
+      # Set up Node.js 20.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Install the exact client dependencies from the lockfile.
+      - run: npm ci
+      # Build the production client bundle.
+      - run: npm run build
