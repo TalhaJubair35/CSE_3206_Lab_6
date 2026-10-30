@@ -66,12 +66,12 @@ export default function Login({ onLogin }) {
         : await signInWithEmailAndPassword(firebaseAuth, email, password);
       const token = await credential.user.getIdToken();
       const endpoint = creatingAccount ? '/auth/register' : '/auth/login';
-      await client.post(endpoint, {}, {
+      const { data } = await client.post(endpoint, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       localStorage.setItem('token', token);
-      onLogin();
+      onLogin(data.user.role);
       navigate('/events', { replace: true });
     } catch (requestError) {
       if (firebaseAuth.currentUser) {

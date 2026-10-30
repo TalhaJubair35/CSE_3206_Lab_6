@@ -18,14 +18,23 @@ export default function AdminReports() {
   useEffect(() => {
     if (!eventId) { setRows([]); return undefined; }
     let active = true;
+    setError('');
     client.get(`/reports/attendance/${eventId}`)
       .then(({ data }) => { if (active) setRows(Array.isArray(data) ? data : []); })
-      .catch((err) => { if (active) setError(err.response?.data?.error || 'Could not load attendance.'); });
+      .catch((err) => {
+        if (active) {
+          setError(err.response?.status === 403
+            ? 'Attendance reports are restricted to admin accounts.'
+            : err.response?.data?.error || 'Could not load attendance.');
+          setRows([]);
+        }
+      });
     return () => { active = false; };
   }, [eventId]);
 
   async function exportCsv() {
     try {
+      setError('');
       const { data } = await client.get(`/reports/attendance/${eventId}?format=csv`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }));
       const anchor = document.createElement('a');
@@ -34,7 +43,9 @@ export default function AdminReports() {
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not export CSV.');
+      setError(err.response?.status === 403
+        ? 'Attendance reports are restricted to admin accounts.'
+        : err.response?.data?.error || 'Could not export CSV.');
     }
   }
 

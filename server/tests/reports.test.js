@@ -80,4 +80,34 @@ describe('attendance report behavior', () => {
     expect(response.headers['content-type']).toMatch(/text\/csv/);
     expect(response.text).toBe('user_id,status\nuser-1,confirmed');
   });
+
+  test('serves JSON attendance data to an authenticated admin', async () => {
+    const lean = jest.fn().mockResolvedValue([
+      { userId: 'user-2', status: 'waitlisted' }
+    ]);
+    Registration.find.mockReturnValue({ lean });
+
+    const response = await request(app)
+      .get('/api/reports/attendance/event-2')
+      .set('Authorization', 'Bearer firebase-id-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([{ user_id: 'user-2', status: 'waitlisted' }]);
+  });
+
+  test('denies attendance reports to a non-admin profile', async () => {
+    User.findOne.mockResolvedValue({
+      _id: { toString: () => 'organizer-user' },
+      firebaseUid: 'organizer-user',
+      email: 'organizer@example.edu',
+      role: 'organizer'
+    });
+
+    const response = await request(app)
+      .get('/api/reports/attendance/event-1')
+      .set('Authorization', 'Bearer firebase-id-token');
+
+    expect(response.status).toBe(403);
+    expect(Registration.find).not.toHaveBeenCalled();
+  });
 });

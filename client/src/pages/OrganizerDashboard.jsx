@@ -32,7 +32,9 @@ export default function OrganizerDashboard() {
       setForm({ title: '', venue: '', capacity: '100', startAt: '' });
       setMessage('Event created.');
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not create event.');
+      setError(err.response?.status === 403
+        ? 'Your account does not have the organizer role. Add your Firebase email to ORGANIZER_EMAILS in server/.env, restart the API, then log out and back in.'
+        : err.response?.data?.error || 'Could not create event.');
     }
   }
 

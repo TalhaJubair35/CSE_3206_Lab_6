@@ -1,6 +1,6 @@
 jest.mock('../src/models/User', () => ({
-  findOneAndUpdate: jest.fn(),
-  findOne: jest.fn()
+  findOne: jest.fn(),
+  create: jest.fn()
 }));
 
 jest.mock('../src/config/firebase', () => ({
@@ -30,14 +30,20 @@ describe('Firebase authentication and MongoDB user profiles', () => {
   let verifyIdToken;
 
   beforeEach(() => {
-    User.findOneAndUpdate.mockReset();
     User.findOne.mockReset();
+    User.create.mockReset();
+    delete process.env.ORGANIZER_EMAILS;
+    User.findOne.mockResolvedValue({
+      ...profile,
+      save: jest.fn().mockResolvedValue(profile)
+    });
     verifyIdToken = jest.fn().mockResolvedValue(firebaseUser);
     getFirebaseAuth.mockReturnValue({ verifyIdToken });
   });
 
   test('creates a MongoDB profile from a verified Firebase registration token', async () => {
-    User.findOneAndUpdate.mockResolvedValue(profile);
+    User.findOne.mockResolvedValue(null);
+    User.create.mockResolvedValue(profile);
 
     const response = await request(app)
       .post('/api/auth/register')
@@ -50,22 +56,26 @@ describe('Firebase authentication and MongoDB user profiles', () => {
       role: 'student'
     });
     expect(verifyIdToken).toHaveBeenCalledWith('firebase-id-token');
-    expect(User.findOneAndUpdate).toHaveBeenCalledWith(
-      { firebaseUid: 'firebase-user-1' },
-      { $set: { email: 'student@example.edu' } },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    );
+    expect(User.create).toHaveBeenCalledWith({
+      firebaseUid: 'firebase-user-1',
+      email: 'student@example.edu',
+      role: 'student'
+    });
   });
 
   test('rejects duplicate email ownership when syncing a Firebase profile', async () => {
-    User.findOneAndUpdate.mockRejectedValue({ code: 11000 });
+    User.findOne.mockResolvedValue(null);
+    User.create.mockRejectedValue({ code: 11000 });
 
     await expect(authService.registerUser({ firebaseUser }))
       .rejects.toMatchObject({ status: 409 });
   });
 
   test('returns the MongoDB profile after a verified Firebase login', async () => {
-    User.findOneAndUpdate.mockResolvedValue(profile);
+    User.findOne.mockResolvedValue({
+      ...profile,
+      save: jest.fn().mockResolvedValue(profile)
+    });
 
     const response = await request(app)
       .post('/api/auth/login')
@@ -77,6 +87,24 @@ describe('Firebase authentication and MongoDB user profiles', () => {
       email: 'student@example.edu',
       role: 'student'
     });
+  });
+
+  test('promotes only an allowlisted email to organizer on login', async () => {
+    process.env.ORGANIZER_EMAILS = 'organizer@example.edu';
+    const existing = {
+      ...profile,
+      role: 'student',
+      email: 'organizer@example.edu',
+      save: jest.fn().mockImplementation(function () { return this; })
+    };
+    User.findOne.mockResolvedValue(existing);
+
+    const result = await authService.loginUser({
+      firebaseUser: { uid: firebaseUser.uid, email: 'Organizer@Example.edu' }
+    });
+
+    expect(result.role).toBe('organizer');
+    expect(existing.save).toHaveBeenCalledTimes(1);
   });
 
   test('rejects requests without or with an invalid Firebase ID token', async () => {
