@@ -1,0 +1,12 @@
+{
+  "name": "campusevents-mern",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "npm --prefix server test",
+    "build": "npm --prefix client run build"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
