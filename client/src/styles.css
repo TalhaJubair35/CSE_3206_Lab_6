@@ -1,0 +1,181 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #f5f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  background: #2456a6;
+  color: white;
+  cursor: pointer;
+  padding: 0.65rem 1rem;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.navbar {
+  align-items: center;
+  background: white;
+  border-bottom: 1px solid #dfe5ef;
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem max(1.25rem, calc((100% - 1100px) / 2));
+}
+
+.brand {
+  color: #173c79;
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.nav-links {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-links a,
+.link-button {
+  color: #35445e;
+  text-decoration: none;
+}
+
+.nav-links a.active {
+  color: #2456a6;
+  font-weight: 700;
+}
+
+.link-button {
+  background: transparent;
+  padding: 0;
+}
+
+.page {
+  margin: 2rem auto;
+  max-width: 1100px;
+  padding: 0 1.25rem;
+}
+
+.narrow {
+  max-width: 480px;
+}
+
+.form,
+.form label {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.form {
+  gap: 1rem;
+}
+
+.form label,
+.select-label {
+  color: #35445e;
+  font-weight: 600;
+}
+
+input,
+select {
+  border: 1px solid #cbd4e2;
+  border-radius: 6px;
+  margin-top: 0.35rem;
+  padding: 0.65rem;
+  width: 100%;
+}
+
+.form-grid {
+  align-items: end;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.panel,
+.card {
+  background: white;
+  border: 1px solid #e0e6ef;
+  border-radius: 10px;
+  margin: 1rem 0;
+  padding: 1.25rem;
+}
+
+.event-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.event-grid .card {
+  margin: 0;
+}
+
+.event-grid h2,
+.panel h2 {
+  margin-top: 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  text-align: left;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e5e9f0;
+  padding: 0.75rem;
+}
+
+.section-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.toast,
+.success {
+  color: #17653a;
+}
+
+.error {
+  color: #a32332;
+}
+
+@media (max-width: 600px) {
+  .navbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .nav-links {
+    flex-wrap: wrap;
+  }
+}
